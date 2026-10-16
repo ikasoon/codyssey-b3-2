@@ -2,8 +2,13 @@
 
 ## 프로젝트 구조와 모듈 구성
 
-Git 변경 사항을 입력받아 커밋 메시지와 PR 초안을 생성하는 Python CLI 프로젝트다. 기능 요구사항은 `docs/assignment.md`를 기준으로 한다. 현재는 개발 환경만 구성되어 있으며 애플리케이션 소스, 테스트, 정적 자산은 없다.
+Git 변경 사항을 입력받아 커밋 메시지와 PR 초안을 생성하는 Python CLI 프로젝트다. 필수 기능 요구사항은 `docs/assignment.md`를 기준으로 하며 보너스 과제는 구현 범위에서 제외한다.
 
+- `main.py`, `gitdraft/cli.py`: CLI 진입점과 실행 흐름.
+- `gitdraft/gitio.py`, `safety.py`: Git 변경 수집과 민감정보 처리.
+- `gitdraft/config.py`, `providers.py`: 환경 설정과 제공자별 모델 생성.
+- `gitdraft/prompts.py`, `drafts.py`, `generator.py`: 프롬프트, 출력 검증과 생성.
+- `tests/`: pytest 단위·통합 테스트. `README.md`: 설치와 사용 가이드.
 - `justfile`: 개발 명령의 공통 진입점.
 - `pyproject.toml`: 프로젝트 정보와 의존성 선언.
 - `uv.lock`: uv가 생성하는 의존성 잠금 파일. 직접 편집하지 않는다.
@@ -14,7 +19,9 @@ Git 변경 사항을 입력받아 커밋 메시지와 PR 초안을 생성하는 
 
 ## LLM 구현과 설정
 
-LLM API 제공자는 **OpenRouter**를 사용하며, LLM 요청과 응답 처리는 **Pydantic AI**로 구현한다. API 키는 루트 `.env`의 `openrouter_api_key`에 설정되어 있다. 이 소문자 이름을 그대로 읽어 모델 제공자에 명시적으로 전달한다. 애플리케이션에서 `.env` 로딩을 구현하되 이미 설정된 환경변수를 덮어쓰지 않는다. 키가 없으면 값을 노출하지 않는 오류를 출력한다.
+기본 LLM API 제공자는 **OpenRouter**이며, LLM 요청과 응답 처리는 **Pydantic AI**로 구현한다. 필요한 제공자만 포함하는 `pydantic-ai-slim[openrouter,openai,anthropic]`을 사용한다. 루트 `.env`의 소문자 `openrouter_api_key`를 읽어 명시적으로 전달하며 기존 환경변수가 우선한다. 키가 없으면 값을 노출하지 않는 오류를 출력한다.
+
+`--provider`로 `openrouter`, `openai-compatible`, `anthropic`을 선택한다. 다른 제공자는 각각 `LLM_API_KEY`, `ANTHROPIC_API_KEY`를 사용하며 모델을 명시한다. 호환 API는 주소도 지정한다. 제공자 변경은 `config.py`와 `providers.py`에 모으고 프롬프트·출력 검증은 공통으로 유지한다. SDK와 Agent의 자동 재시도를 끄고 요청을 1회로 제한한다.
 
 ## 환경 설정과 개발 명령
 
@@ -23,13 +30,14 @@ LLM API 제공자는 **OpenRouter**를 사용하며, LLM 요청과 응답 처리
 - `just`: 사용 가능한 명령 목록을 표시한다.
 - `just setup`: 잠금 파일에 맞춰 `.venv`를 생성하고 동기화한다.
 - `just run python --version`: 프로젝트 환경의 Python을 확인한다. 다른 명령과 인자도 전달할 수 있다.
-- `just add pydantic-ai`: 구현에 사용할 Pydantic AI 의존성을 추가한다.
-- `just add --dev pytest`: pytest를 개발 의존성으로 추가한다.
+- `just commit`, `just pr`: 현재 Git 변경에서 커밋 또는 PR 초안을 생성한다.
+- `just test -q`: 실제 API 요청 없이 pytest를 실행한다.
+- `just add <패키지>`, `just add --dev <패키지>`: 실행·개발 의존성을 추가한다.
 - `just remove <패키지>`: 의존성을 제거한다.
 - `just lock`: 의존성 선언을 직접 변경한 뒤 잠금 파일을 갱신한다.
 - `just check`: 의존성 선언과 잠금 파일이 일치하는지 검사한다.
 
-환경과 의존성은 uv로 관리하며 `pyproject.toml`과 `uv.lock`을 함께 커밋한다. `setup`과 `run`은 잠금 파일이 오래되면 실패하므로 먼저 의존성 변경을 반영한다. 아직 빌드 명령과 실행할 애플리케이션은 없다.
+환경과 의존성은 uv로 관리하며 `pyproject.toml`과 `uv.lock`을 함께 커밋한다. 실행 시 `--locked`로 의존성 변경을 검사하므로 먼저 잠금 파일을 갱신한다. 배포용 패키지 빌드는 사용하지 않는다.
 
 ## 코드 스타일과 이름 규칙
 
@@ -37,7 +45,7 @@ LLM API 제공자는 **OpenRouter**를 사용하며, LLM 요청과 응답 처리
 
 ## 테스트 지침
 
-테스트 프레임워크는 **pytest**를 사용한다. 아직 의존성과 테스트 파일은 추가되지 않았으며 커버리지 기준도 없다. `tests/test_*.py`와 `test_*` 이름을 사용하고, 설치 후 `just run pytest`로 실행한다. `just check`는 잠금 파일만 검사한다. LLM 호출은 모킹하여 실제 OpenRouter 요청과 API 키 없이 테스트한다. 임시 Git 저장소로 빈 diff, 인증 누락, API 오류, CLI 옵션, 민감정보 처리를 검증한다. 커밋 제목 최대 72자, 영문 유형과 한국어 요약, 필수 본문 5개 항목을 검증한다. PR 제목 최대 80자와 필수 본문 형식도 확인한다.
+테스트 프레임워크는 **pytest**다. `tests/test_*.py`와 `test_*` 이름을 사용하며 `just test` 또는 `just run pytest`로 실행한다. 커버리지 수치 기준은 없고 `just check`는 잠금 파일만 검사한다. `tests/conftest.py`에서 실제 모델 요청을 차단한다. 비동기 `FunctionModel`과 임시 Git 저장소로 빈 diff, 인증 누락, API 오류, CLI 옵션, 민감정보 처리를 검증한다. 커밋 제목 최대 72자, 영문 유형과 한국어 요약, 필수 본문 5개 항목을 검증한다. PR 제목 최대 80자와 필수 본문 형식도 확인한다.
 
 ## 커밋과 PR 지침
 
@@ -87,4 +95,4 @@ PR 본문에는 `Why`, `What`, `How to Test`를 작성하고 각 항목에 불�
 
 ## 보안과 구현 범위
 
-API 키는 환경변수로만 읽고 코드·로그·커밋에 포함하지 않는다. `.env`는 Git 제외 대상이며 현재 `justfile`은 자동으로 읽지 않는다. diff 마스킹 또는 전송량 제한을 안전 모드로 제공한다. 명령당 API 호출은 1회를 권장한다. 결과는 검토 가능한 초안으로 출력하며 자동 push와 원격 PR 생성은 구현하지 않는다.
+API 키는 환경변수로 읽고 코드·로그·커밋에 포함하지 않는다. `.env`는 Git 제외 대상이며 애플리케이션에서 로딩한다. 기본 안전 모드는 최대 10개 파일·200줄·40,000자를 전송한다. 민감 파일 제외와 기본 마스킹은 제한 해제 시에도 유지한다. Git 수집은 `status`와 `diff`만 사용하고 인덱스를 수정하지 않는다. 결과는 검토 가능한 초안으로 출력하며 프로그램의 자동 커밋·push·원격 PR 생성은 구현하지 않는다.
