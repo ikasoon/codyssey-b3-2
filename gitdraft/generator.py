@@ -4,7 +4,7 @@ import anthropic
 import openai
 from pydantic import ValidationError
 from pydantic_ai import Agent, PromptedOutput
-from pydantic_ai.exceptions import AgentRunError, ModelHTTPError, UserError
+from pydantic_ai.exceptions import AgentRunError, ModelAPIError, ModelHTTPError, UserError
 from pydantic_ai.models import Model
 from pydantic_ai.usage import UsageLimits
 
@@ -68,6 +68,13 @@ async def generate(
         raise DraftError("API 응답 시간이 초과되었습니다. 잠시 후 다시 시도하세요.") from None
     except (openai.APIConnectionError, anthropic.APIConnectionError):
         raise DraftError("API에 연결할 수 없습니다. 네트워크와 API 주소를 확인하세요.") from None
+    except ModelAPIError as exc:
+        cause = exc.__cause__
+        if isinstance(cause, (openai.APITimeoutError, anthropic.APITimeoutError, TimeoutError)):
+            raise DraftError("API 응답 시간이 초과되었습니다. 잠시 후 다시 시도하세요.") from None
+        if isinstance(cause, (openai.APIConnectionError, anthropic.APIConnectionError)):
+            raise DraftError("API에 연결할 수 없습니다. 네트워크와 API 주소를 확인하세요.") from None
+        raise DraftError("제공자가 유효한 API 응답을 반환하지 않았습니다. 서비스 상태와 모델을 확인하세요.") from None
     except (AgentRunError, ValidationError):
         raise DraftError("LLM 응답이 한국어 초안 형식에 맞지 않습니다. 모델 또는 max-tokens를 확인하세요.") from None
     except UserError:

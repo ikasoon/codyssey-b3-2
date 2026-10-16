@@ -2,7 +2,9 @@ import asyncio
 import json
 
 import pytest
-from pydantic_ai.exceptions import ModelHTTPError
+import httpx2
+import openai
+from pydantic_ai.exceptions import ModelAPIError, ModelHTTPError
 from pydantic_ai.messages import ModelResponse, TextPart, UserPromptPart
 from pydantic_ai.models.function import FunctionModel
 
@@ -63,6 +65,18 @@ def test_timeout_is_reported_without_raw_exception():
     async def fail(messages, info):
         raise TimeoutError("private-test-key")
     with pytest.raises(DraftError, match="시간이 초과") as exc:
+        asyncio.run(generate(CHANGES, "commit", CONFIG, RequestStats(), model=FunctionModel(fail)))
+    assert "private-test-key" not in str(exc.value)
+
+
+@pytest.mark.parametrize("timed_out,reason", [(True, "시간이 초과"), (False, "연결할 수 없습니다")])
+def test_wrapped_sdk_network_errors(timed_out, reason):
+    async def fail(messages, info):
+        request = httpx2.Request("POST", "https://example.com")
+        cause = (openai.APITimeoutError(request) if timed_out
+                 else openai.APIConnectionError(request=request))
+        raise ModelAPIError("model", "private-test-key") from cause
+    with pytest.raises(DraftError, match=reason) as exc:
         asyncio.run(generate(CHANGES, "commit", CONFIG, RequestStats(), model=FunctionModel(fail)))
     assert "private-test-key" not in str(exc.value)
 
