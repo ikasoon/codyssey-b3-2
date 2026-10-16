@@ -25,7 +25,7 @@ def redact(text: str, secrets: tuple[str, ...] = ()) -> str:
         if name.lower().endswith(("api_key", "token", "secret", "password"))
     )
     for value in sorted(values, key=len, reverse=True):
-        if value and len(value) >= 8:
+        if value and (value in secrets or len(value) >= 8):
             text = text.replace(value, "[REDACTED]")
     text = re.sub(r"\bsk-[A-Za-z0-9_-]{8,}\b", "[REDACTED]", text)
     text = re.sub(r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}", "[EMAIL]", text)
