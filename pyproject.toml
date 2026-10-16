@@ -1,0 +1,9 @@
+[project]
+name = "b3-2"
+version = "0.1.0"
+description = "Git 변경 사항으로 커밋 메시지와 PR 초안을 생성하는 Python CLI"
+requires-python = ">=3.10"
+dependencies = []
+
+[tool.uv]
+package = false
