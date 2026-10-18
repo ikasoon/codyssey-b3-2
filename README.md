@@ -53,12 +53,44 @@ just commit --help
 | `--model` | 기본값 없음; 모든 제공자에서 `--model` 또는 `LLM_MODEL` 필수 |
 | `--temperature` | `0.2`; 이 CLI의 허용 범위는 `0`~`1` |
 | `--max-tokens` | `2048`; 응답 토큰 상한 |
+| `--api-timeout` | `60`; API SDK 타임아웃(초) |
+| `--git-timeout` | `30`; Git 명령당 타임아웃(초) |
 | `--base-url` | OpenAI 호환 제공자의 API 주소 |
 | `--api-key-env` | 키가 들어 있는 환경변수 **이름** |
 | `--safe-mode` | 기본 활성화; 입력량 제한 |
 | `--no-safe-mode` | 입력량 제한 해제 |
 
 옵션은 `commit`·`pr` 앞이나 뒤에 사용할 수 있다. 과제 예시의 `-model`, `-temperature`, `-max-tokens`, `-safe-mode` 표기도 지원한다.
+
+## 설정 관리와 우선순위
+
+`gitdraft/config.py`의 `Settings`가 실행 설정의 기본값과 타입·범위를 정의한다. 저장소 루트 `.env`를 한 번 읽고 기존 셸 환경변수를 유지한 뒤, [Pydantic Settings](https://docs.pydantic.dev/latest/concepts/pydantic_settings/)로 검증한다. 우선순위는 **명시한 CLI 옵션 > 셸 환경변수 > .env > Settings 기본값**이다. CLI에서 생략한 옵션은 환경 설정을 덮어쓰지 않으며 `temperature=0`, `safe_mode=false`도 그대로 적용한다.
+
+| CLI 옵션 | 환경변수 | 기본값·조건 |
+| --- | --- | --- |
+| `--provider` | `LLM_PROVIDER` | `openrouter` |
+| `--model` | `LLM_MODEL` | 기본 모델 없음; 생성 시 필수 |
+| `--temperature` | `LLM_TEMPERATURE` | `0.2`; 유한한 수, `0`~`1` |
+| `--max-tokens` | `LLM_MAX_TOKENS` | `2048`; 양의 정수 |
+| `--api-timeout` | `LLM_TIMEOUT_SECONDS` | `60`; API SDK 타임아웃, 양의 유한한 초 단위 수 |
+| `--git-timeout` | `GITDRAFT_GIT_TIMEOUT_SECONDS` | `30`; Git 명령당 제한 시간, 양의 유한한 초 단위 수 |
+| `--safe-mode` / `--no-safe-mode` | `GITDRAFT_SAFE_MODE` | `true`; `.env`에는 `true` 또는 `false` 권장 |
+| `--base-url` | `LLM_BASE_URL` | OpenAI 호환 제공자에서 필수 |
+| `--api-key-env` | `LLM_API_KEY_ENV` | 선택한 제공자의 기본 키 변수 이름 |
+
+아래 항목을 기존 `.env`에 추가하면 반복 입력을 줄일 수 있다. API 키는 기존 제공자별 키 변수를 그대로 사용한다.
+
+```dotenv
+LLM_TEMPERATURE=0.2
+LLM_MAX_TOKENS=2048
+LLM_TIMEOUT_SECONDS=60
+GITDRAFT_GIT_TIMEOUT_SECONDS=30
+GITDRAFT_SAFE_MODE=true
+```
+
+키 값과 모델에는 대체 기본값이 없다. 알려진 설정의 빈 값·타입 오류·범위 초과는 기본값으로 대체하지 않고 오류로 처리한다. 변경이 없어 초안을 생성하지 않을 때는 모델·API 키 없이도 정상 종료한다. API 키와 잘못된 설정값 원문은 오류 메시지에 포함하지 않는다.
+
+입력 제한, 자동 재시도 0회, 모델 요청 최대 1회와 제목 길이는 `gitdraft/policy.py`의 고정 규칙이다. 환경변수로 변경하지 않으며 안전 모드 해제 시에도 민감 파일 제외와 마스킹은 유지한다. TOML 설정 파일은 사용하지 않는다.
 
 ## 생성 파라미터 조정
 
@@ -127,6 +159,18 @@ just commit --api-key-env MY_OPENROUTER_KEY
 ```
 
 `LLM_PROVIDER`, `LLM_MODEL`, `LLM_BASE_URL`, `LLM_API_KEY_ENV`로 같은 설정을 저장할 수 있다. 제공자를 바꿀 때 해당 제공자의 모델 ID와 키 변수를 지정한다. `LLM_BASE_URL`은 `openai-compatible`에서만 사용하므로 다른 제공자로 전환할 때 제거한다. 기본 OpenRouter 키를 다른 제공자에게 자동으로 전달하지 않는다.
+
+제공자 선택과 인증값 조회는 별도 단계다. 먼저 `--provider` 또는 `LLM_PROVIDER`로 API 제공자를 선택하고, 그 제공자의 키를 읽는다. `ANTHROPIC_API_KEY`가 존재해도 Anthropic으로 자동 전환하지 않는다. OpenRouter 모델 ID의 `google/`도 모델 제작자를 나타낼 뿐 Google API로 연결을 바꾸지 않는다.
+
+[Pydantic AI](https://pydantic.dev/docs/ai/models/overview/)는 제공자 접두사나 명시적인 Provider 객체로 연결을 선택하고, [Aider의 OpenRouter 연동](https://aider.chat/docs/llms/openrouter.html)은 `openrouter/` 모델 접두사와 `OPENROUTER_API_KEY`를 함께 사용한다. 이 프로젝트의 소문자 `openrouter_api_key`는 기존 설정과의 호환을 위해 유지하며 SDK에 명시적으로 전달한다.
+
+키 변수 이름을 제공자와 독립적으로 관리하려면 다음처럼 지정한다. `LLM_API_KEY_ENV`의 값은 실제 키가 아닌 **키를 저장한 환경변수 이름**이다.
+
+```dotenv
+LLM_PROVIDER=openrouter
+LLM_API_KEY_ENV=TEAM_LLM_TOKEN
+TEAM_LLM_TOKEN=발급받은_API_키
+```
 
 호환 API는 HTTPS 주소를 사용한다. 로컬 서버는 `http://localhost:11434/v1`처럼 HTTP를 사용할 수 있으며, 인증이 없는 서버도 SDK 초기화를 위해 `LLM_API_KEY=local` 같은 빈 값이 아닌 값을 설정한다. 해당 모델이 지시를 따르고 JSON 형식의 한국어 응답을 생성할 수 있어야 한다.
 
@@ -253,7 +297,7 @@ Pydantic AI는 검증 피드백을 통한 재시도를 지원하지만, 이 프�
 - 키 누락: 선택한 제공자의 키 변수와 `.env` 위치를 확인한다.
 - HTTP 401·403: 키의 유효성과 API 접근 권한을 확인한다.
 - HTTP 402·429: 잔액이나 요청 한도를 확인한다.
-- 연결 실패·시간 초과: 네트워크, API 주소와 제공자 상태를 확인한다.
+- 연결 실패·시간 초과: 네트워크, API 주소와 제공자 상태를 확인한다. 필요한 경우 `--api-timeout` 또는 `--git-timeout`을 조정한다.
 - 응답 형식 오류: 모델의 한국어·JSON 출력 지원을 확인한다. 토큰 부족이 의심되면 [생성 파라미터 조정](#생성-파라미터-조정)에 따라 출력 예산을 늘린다.
 
 키, API 오류 응답 본문과 원본 diff는 오류 로그에 출력하지 않는다.
