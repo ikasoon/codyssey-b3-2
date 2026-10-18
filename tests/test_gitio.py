@@ -34,8 +34,8 @@ def test_rename_status_with_special_filename():
 
 
 def test_secrets_excluded_and_limits_applied(repo, monkeypatch):
-    monkeypatch.setenv("openrouter_api_key", "sk-or-secret-value")
-    (repo / ".env").write_text("openrouter_api_key=must-not-send\n")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-secret-value")
+    (repo / ".env").write_text("OPENROUTER_API_KEY=must-not-send\n")
     git(repo, "add", ".env")
     for i in range(12):
         (repo / f"file{i:02}.txt").write_text("sk-or-secret-value user@example.com\n" * 50)

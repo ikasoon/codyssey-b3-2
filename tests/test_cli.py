@@ -28,7 +28,7 @@ def test_missing_key_returns_error(repo, monkeypatch, capsys):
     (repo / "main.py").write_text("print('hello')\n")
     assert main(["commit", "--model", "custom-model"]) == 1
     output = capsys.readouterr()
-    assert "openrouter_api_key" in output.err
+    assert "OPENROUTER_API_KEY" in output.err
     assert "API 호출 시도: 0회" in output.err
     assert not output.out
 
@@ -36,7 +36,7 @@ def test_missing_key_returns_error(repo, monkeypatch, capsys):
 @pytest.mark.parametrize("command", ["commit", "pr"])
 def test_missing_model_returns_error_without_api_call(repo, monkeypatch, capsys, command):
     monkeypatch.chdir(repo)
-    monkeypatch.setenv("openrouter_api_key", "private-test-key")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "private-test-key")
     (repo / "sample.py").write_text("print('hello')\n")
     assert main([command]) == 1
     output = capsys.readouterr()
@@ -56,7 +56,7 @@ def test_missing_model_returns_error_without_api_call(repo, monkeypatch, capsys,
 def test_full_cli_with_fake_model(repo, monkeypatch, capsys, command, data, heading,
                                   model_args, expected_model):
     monkeypatch.chdir(repo)
-    (repo / ".env").write_text("openrouter_api_key=private-test-key\nLLM_MODEL=file-model\n")
+    (repo / ".env").write_text("OPENROUTER_API_KEY=private-test-key\nLLM_MODEL=file-model\n")
     (repo / "sample.py").write_text("print('hello')\n")
     async def respond(messages, info):
         assert info.model_settings["temperature"] == 0.3
@@ -78,7 +78,7 @@ def test_full_cli_with_fake_model(repo, monkeypatch, capsys, command, data, head
 
 def test_only_sensitive_files_skip_model(repo, monkeypatch, capsys):
     monkeypatch.chdir(repo)
-    (repo / ".env").write_text("openrouter_api_key=private-test-key\n")
+    (repo / ".env").write_text("OPENROUTER_API_KEY=private-test-key\n")
     assert main(["pr"]) == 0
     assert "API 호출 시도: 0회" in capsys.readouterr().err
 
@@ -93,7 +93,7 @@ def test_runtime_settings_reach_collection_and_generation(
 ):
     monkeypatch.chdir(repo)
     (repo / ".env").write_text(
-        "openrouter_api_key=private-test-key\nLLM_MODEL=file-model\n"
+        "OPENROUTER_API_KEY=private-test-key\nLLM_MODEL=file-model\n"
         "LLM_TEMPERATURE=0.7\nLLM_MAX_TOKENS=1024\nLLM_TIMEOUT_SECONDS=12.5\n"
         "GITDRAFT_GIT_TIMEOUT_SECONDS=7.5\nGITDRAFT_SAFE_MODE=false\n"
     )
@@ -158,7 +158,7 @@ def test_legacy_option_spelling_and_safe_mode():
 
 def test_generation_failure_has_no_partial_output(repo, monkeypatch, capsys):
     monkeypatch.chdir(repo)
-    monkeypatch.setenv("openrouter_api_key", "private-test-key")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "private-test-key")
     monkeypatch.setenv("LLM_MODEL", "test-model")
     (repo / "sample.txt").write_text("hello\n")
     async def fail(changes, kind, config, stats):

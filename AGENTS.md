@@ -19,7 +19,7 @@ Git 변경 사항을 입력받아 커밋 메시지와 PR 초안을 생성하는 
 
 ## LLM 구현과 설정
 
-기본 LLM API 제공자는 **OpenRouter**이며, LLM 요청과 응답 처리는 **Pydantic AI**로 구현한다. 필요한 제공자만 포함하는 `pydantic-ai-slim[openrouter,openai,anthropic]`을 사용한다. 루트 `.env`의 소문자 `openrouter_api_key`를 읽어 명시적으로 전달하며 기존 환경변수가 우선한다. 키가 없으면 값을 노출하지 않는 오류를 출력한다.
+기본 LLM API 제공자는 **OpenRouter**이며, LLM 요청과 응답 처리는 **Pydantic AI**로 구현한다. 필요한 제공자만 포함하는 `pydantic-ai-slim[openrouter,openai,anthropic]`을 사용한다. 루트 `.env`의 대문자 `OPENROUTER_API_KEY`를 읽어 명시적으로 전달하며 기존 환경변수가 우선한다. 키가 없으면 값을 노출하지 않는 오류를 출력한다.
 
 `--provider`로 `openrouter`, `openai-compatible`, `anthropic`을 선택한다. 다른 제공자는 각각 `LLM_API_KEY`, `ANTHROPIC_API_KEY`를 사용하며 모델을 명시한다. 호환 API는 주소도 지정한다. 제공자 변경은 `config.py`와 `providers.py`에 모으고 프롬프트·출력 검증은 공통으로 유지한다. SDK와 Agent의 자동 재시도를 끄고 요청을 1회로 제한한다.
 

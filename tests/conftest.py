@@ -8,7 +8,7 @@ from gitdraft.config import Settings
 @pytest.fixture(autouse=True)
 def no_live_models(monkeypatch):
     monkeypatch.setattr(models, "ALLOW_MODEL_REQUESTS", False)
-    for name in ("openrouter_api_key", "ANTHROPIC_API_KEY", "LLM_API_KEY",
+    for name in ("OPENROUTER_API_KEY", "ANTHROPIC_API_KEY", "LLM_API_KEY",
                  *(field.validation_alias for field in Settings.model_fields.values())):
         monkeypatch.delenv(name, raising=False)
 

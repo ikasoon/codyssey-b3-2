@@ -18,7 +18,7 @@ class ProviderDefinition:
 
 
 PROVIDER_DEFINITIONS = {
-    "openrouter": ProviderDefinition("openrouter_api_key", "https://openrouter.ai/api/v1"),
+    "openrouter": ProviderDefinition("OPENROUTER_API_KEY", "https://openrouter.ai/api/v1"),
     "openai-compatible": ProviderDefinition("LLM_API_KEY", None),
     "anthropic": ProviderDefinition("ANTHROPIC_API_KEY", None),
 }

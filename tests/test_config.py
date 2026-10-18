@@ -4,11 +4,11 @@ from gitdraft.config import PROVIDERS, load_environment, resolve_config, resolve
 from gitdraft.errors import DraftError
 
 
-def test_dotenv_preserves_environment_and_lowercase_key(tmp_path, monkeypatch):
+def test_dotenv_preserves_environment_and_uppercase_key(tmp_path, monkeypatch):
     (tmp_path / ".env").write_text(
-        "openrouter_api_key=file-value\nLLM_MODEL=file-model\n", encoding="utf-8",
+        "OPENROUTER_API_KEY=file-value\nLLM_MODEL=file-model\n", encoding="utf-8",
     )
-    monkeypatch.setenv("openrouter_api_key", "existing-value")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "existing-value")
     monkeypatch.setenv("LLM_MODEL", "existing-model")
     load_environment(tmp_path)
     config = resolve_config()
@@ -20,7 +20,7 @@ def test_dotenv_preserves_environment_and_lowercase_key(tmp_path, monkeypatch):
 
 def test_dotenv_loads_key_and_model(tmp_path):
     (tmp_path / ".env").write_text(
-        "openrouter_api_key=file-value\nLLM_MODEL=file-model\n", encoding="utf-8",
+        "OPENROUTER_API_KEY=file-value\nLLM_MODEL=file-model\n", encoding="utf-8",
     )
     load_environment(tmp_path)
     config = resolve_config()
@@ -38,12 +38,12 @@ def test_missing_or_blank_model_is_rejected(provider, model, monkeypatch):
 
 
 def test_explicit_model_without_environment(monkeypatch):
-    monkeypatch.setenv("openrouter_api_key", "private-key")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "private-key")
     assert resolve_config(model="custom-model").model == "custom-model"
 
 
 def test_provider_switch_does_not_reuse_openrouter_key(monkeypatch):
-    monkeypatch.setenv("openrouter_api_key", "private-key")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "private-key")
     with pytest.raises(DraftError, match="ANTHROPIC_API_KEY"):
         resolve_config(provider="anthropic", model="custom-model")
 
@@ -113,12 +113,12 @@ def test_explicit_blank_model_does_not_fall_back(monkeypatch, model):
 
 
 @pytest.mark.parametrize("provider,key_name", [
-    ("openrouter", "openrouter_api_key"),
+    ("openrouter", "OPENROUTER_API_KEY"),
     ("openai-compatible", "LLM_API_KEY"),
     ("anthropic", "ANTHROPIC_API_KEY"),
 ])
 def test_provider_selects_only_its_credential(monkeypatch, provider, key_name):
-    for name in ("openrouter_api_key", "LLM_API_KEY", "ANTHROPIC_API_KEY"):
+    for name in ("OPENROUTER_API_KEY", "LLM_API_KEY", "ANTHROPIC_API_KEY"):
         monkeypatch.setenv(name, f"secret-{name}")
     config = resolve_config(provider=provider, model="test-model",
                             base_url="http://localhost:11434/v1" if provider == "openai-compatible" else None)
@@ -129,7 +129,7 @@ def test_provider_selects_only_its_credential(monkeypatch, provider, key_name):
 def test_key_presence_does_not_choose_provider(monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "private-anthropic-key")
     monkeypatch.setenv("LLM_API_KEY", "private-generic-key")
-    with pytest.raises(DraftError, match="openrouter_api_key"):
+    with pytest.raises(DraftError, match="OPENROUTER_API_KEY"):
         resolve_config(model="test-model")
 
 
@@ -156,7 +156,7 @@ def test_custom_key_name_is_independent_of_provider(tmp_path, monkeypatch, provi
     ({"provider": "openai-compatible", "base_url": "https://user:pass@example.com"}, "HTTPS API 주소"),
 ])
 def test_invalid_config(options, error, monkeypatch):
-    monkeypatch.setenv("openrouter_api_key", "private-key")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "private-key")
     monkeypatch.setenv("LLM_MODEL", "test-model")
     with pytest.raises(DraftError, match=error):
         resolve_config(**options)

@@ -25,7 +25,7 @@ CHANGES = Changes(" M sample.py", "+변경 내용 private-test-key", 1, 1)
 
 @pytest.fixture
 def config(monkeypatch):
-    monkeypatch.setenv("openrouter_api_key", "private-test-key")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "private-test-key")
     return resolve_config(model="test-model", temperature=0.4, max_tokens=1500)
 
 

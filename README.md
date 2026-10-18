@@ -18,11 +18,11 @@ uv가 `.python-version`에 지정한 Python 3.12와 `uv.lock`의 의존성으로
 루트 `.env`에 다음 항목을 설정한다. 기존 파일이 없으면 `.env.example`을 복사해서 시작할 수 있다.
 
 ```dotenv
-openrouter_api_key=발급받은_OpenRouter_API_키
+OPENROUTER_API_KEY=발급받은_OpenRouter_API_키
 LLM_MODEL=openai/gpt-4.1-mini
 ```
 
-변수 이름은 소문자 `openrouter_api_key`다. `.env`는 애플리케이션 시작 시 읽으며, 이미 설정된 셸 환경변수가 우선한다. 키는 코드나 CLI 인자로 입력하지 않는다. `.env`는 Git 제외 대상이다.
+변수 이름은 대문자 `OPENROUTER_API_KEY`다. `.env`는 애플리케이션 시작 시 읽으며, 이미 설정된 셸 환경변수가 우선한다. 키는 코드나 CLI 인자로 입력하지 않는다. `.env`는 Git 제외 대상이다.
 
 모델에는 코드 기본값이 없다. 위 모델 ID는 설정 예시이며, 사용할 모델을 `.env`·셸 환경변수의 `LLM_MODEL` 또는 `--model`로 반드시 지정한다. 초안 생성 시 모델이 없거나 공백뿐이면 API 호출 없이 오류로 종료한다.
 
@@ -143,7 +143,7 @@ just pr --temperature 0.2 --max-tokens 4096
 
 | 제공자 | 기본 키 변수 | 추가 설정 |
 | --- | --- | --- |
-| `openrouter` | `openrouter_api_key` | `--model` 또는 `LLM_MODEL`에 OpenRouter 모델 ID 지정 |
+| `openrouter` | `OPENROUTER_API_KEY` | `--model` 또는 `LLM_MODEL`에 OpenRouter 모델 ID 지정 |
 | `openai-compatible` | `LLM_API_KEY` | 모델과 API 주소 필수 (`--model`/`LLM_MODEL`, `--base-url`/`LLM_BASE_URL`) |
 | `anthropic` | `ANTHROPIC_API_KEY` | `--model` 또는 `LLM_MODEL` 필수 |
 
@@ -162,7 +162,7 @@ just commit --api-key-env MY_OPENROUTER_KEY
 
 제공자 선택과 인증값 조회는 별도 단계다. 먼저 `--provider` 또는 `LLM_PROVIDER`로 API 제공자를 선택하고, 그 제공자의 키를 읽는다. `ANTHROPIC_API_KEY`가 존재해도 Anthropic으로 자동 전환하지 않는다. OpenRouter 모델 ID의 `google/`도 모델 제작자를 나타낼 뿐 Google API로 연결을 바꾸지 않는다.
 
-[Pydantic AI](https://pydantic.dev/docs/ai/models/overview/)는 제공자 접두사나 명시적인 Provider 객체로 연결을 선택하고, [Aider의 OpenRouter 연동](https://aider.chat/docs/llms/openrouter.html)은 `openrouter/` 모델 접두사와 `OPENROUTER_API_KEY`를 함께 사용한다. 이 프로젝트의 소문자 `openrouter_api_key`는 기존 설정과의 호환을 위해 유지하며 SDK에 명시적으로 전달한다.
+[Pydantic AI](https://pydantic.dev/docs/ai/models/overview/)는 제공자 접두사나 명시적인 Provider 객체로 연결을 선택하고, [Aider의 OpenRouter 연동](https://aider.chat/docs/llms/openrouter.html)은 `openrouter/` 모델 접두사와 `OPENROUTER_API_KEY`를 함께 사용한다. 이 프로젝트도 대문자 `OPENROUTER_API_KEY`를 사용하며 SDK에 명시적으로 전달한다.
 
 키 변수 이름을 제공자와 독립적으로 관리하려면 다음처럼 지정한다. `LLM_API_KEY_ENV`의 값은 실제 키가 아닌 **키를 저장한 환경변수 이름**이다.
 
