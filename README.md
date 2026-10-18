@@ -13,15 +13,18 @@ just test
 
 uv가 `.python-version`에 지정한 Python 3.12와 `uv.lock`의 의존성으로 `.venv`를 구성한다. Python 3.10 이상을 지원하며 별도의 가상환경 활성화는 필요 없다. Pydantic AI는 필요한 제공자만 포함하는 `pydantic-ai-slim[openrouter,openai,anthropic]` 배포판을 사용한다.
 
-## API 키 설정
+## API 키와 모델 설정
 
 루트 `.env`에 다음 항목을 설정한다. 기존 파일이 없으면 `.env.example`을 복사해서 시작할 수 있다.
 
 ```dotenv
 openrouter_api_key=발급받은_OpenRouter_API_키
+LLM_MODEL=openai/gpt-4.1-mini
 ```
 
 변수 이름은 소문자 `openrouter_api_key`다. `.env`는 애플리케이션 시작 시 읽으며, 이미 설정된 셸 환경변수가 우선한다. 키는 코드나 CLI 인자로 입력하지 않는다. `.env`는 Git 제외 대상이다.
+
+모델에는 코드 기본값이 없다. 위 모델 ID는 설정 예시이며, 사용할 모델을 `.env`·셸 환경변수의 `LLM_MODEL` 또는 `--model`로 반드시 지정한다. 초안 생성 시 모델이 없거나 공백뿐이면 API 호출 없이 오류로 종료한다.
 
 ## 실행
 
@@ -47,7 +50,7 @@ just commit --help
 | 옵션 | 기본값과 의미 |
 | --- | --- |
 | `--provider` | `openrouter`; 제공자 선택 |
-| `--model` | OpenRouter는 `openai/gpt-4.1-mini`; 다른 제공자는 명시 필요 |
+| `--model` | 기본값 없음; 모든 제공자에서 `--model` 또는 `LLM_MODEL` 필수 |
 | `--temperature` | `0.2`; 이 CLI의 허용 범위는 `0`~`1` |
 | `--max-tokens` | `2048`; 응답 토큰 상한 |
 | `--base-url` | OpenAI 호환 제공자의 API 주소 |
@@ -104,13 +107,13 @@ just pr --temperature 0.2 --max-tokens 4096
 
 ## LLM 제공자 변경
 
-제공자와 모델 설정은 `CLI 옵션 > 환경변수 또는 .env > 기본값` 순서로 적용한다.
+제공자와 모델 설정은 `CLI 옵션 > 셸 환경변수 > .env` 순서로 적용한다. 제공자를 생략하면 `openrouter`를 사용하지만, 모델은 모든 제공자에서 명시해야 한다.
 
 | 제공자 | 기본 키 변수 | 추가 설정 |
 | --- | --- | --- |
-| `openrouter` | `openrouter_api_key` | 모델 변경 시 OpenRouter 모델 ID 사용 |
-| `openai-compatible` | `LLM_API_KEY` | `--model`, `--base-url` 필수 |
-| `anthropic` | `ANTHROPIC_API_KEY` | `--model` 필수 |
+| `openrouter` | `openrouter_api_key` | `--model` 또는 `LLM_MODEL`에 OpenRouter 모델 ID 지정 |
+| `openai-compatible` | `LLM_API_KEY` | 모델과 API 주소 필수 (`--model`/`LLM_MODEL`, `--base-url`/`LLM_BASE_URL`) |
+| `anthropic` | `ANTHROPIC_API_KEY` | `--model` 또는 `LLM_MODEL` 필수 |
 
 ```sh
 # .env에 LLM_API_KEY를 먼저 설정한다.
@@ -246,6 +249,7 @@ Pydantic AI는 검증 피드백을 통한 재시도를 지원하지만, 이 프�
 
 ## 오류 대응
 
+- 모델 누락: `--model` 또는 `.env`·셸 환경변수의 `LLM_MODEL`에 빈 값이 아닌 모델 ID를 지정한다.
 - 키 누락: 선택한 제공자의 키 변수와 `.env` 위치를 확인한다.
 - HTTP 401·403: 키의 유효성과 API 접근 권한을 확인한다.
 - HTTP 402·429: 잔액이나 요청 한도를 확인한다.

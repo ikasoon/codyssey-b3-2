@@ -35,7 +35,7 @@ def token_value(value: str) -> int:
 def parser() -> argparse.ArgumentParser:
     options = argparse.ArgumentParser(add_help=False, argument_default=argparse.SUPPRESS)
     options.add_argument("--provider", choices=PROVIDERS, help="LLM 제공자 (기본: OpenRouter)")
-    options.add_argument("--model", "-model", help="모델 이름 (OpenRouter 기본: openai/gpt-4.1-mini)")
+    options.add_argument("--model", "-model", help="모델 이름 (--model 또는 LLM_MODEL 필수, 기본값 없음)")
     options.add_argument("--base-url", help="OpenAI 호환 API 주소")
     options.add_argument("--api-key-env", help="API 키가 들어 있는 환경변수 이름")
     options.add_argument("--temperature", "-temperature", type=temperature_value, help="생성 온도, 0~1 (기본: 0.2)")

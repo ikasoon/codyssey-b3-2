@@ -25,19 +25,37 @@ def test_clean_repository_does_not_need_key(repo, monkeypatch, capsys):
 def test_missing_key_returns_error(repo, monkeypatch, capsys):
     monkeypatch.chdir(repo)
     (repo / "main.py").write_text("print('hello')\n")
-    assert main(["commit"]) == 1
+    assert main(["commit", "--model", "custom-model"]) == 1
     output = capsys.readouterr()
     assert "openrouter_api_key" in output.err
     assert "API 호출 시도: 0회" in output.err
     assert not output.out
 
 
+@pytest.mark.parametrize("command", ["commit", "pr"])
+def test_missing_model_returns_error_without_api_call(repo, monkeypatch, capsys, command):
+    monkeypatch.chdir(repo)
+    monkeypatch.setenv("openrouter_api_key", "private-test-key")
+    (repo / "sample.py").write_text("print('hello')\n")
+    assert main([command]) == 1
+    output = capsys.readouterr()
+    assert "모델이 설정되지 않았습니다" in output.err
+    assert "--model" in output.err and "LLM_MODEL" in output.err
+    assert "API 호출 시도: 0회" in output.err
+    assert "private-test-key" not in output.out + output.err
+    assert not output.out
+
+
 @pytest.mark.parametrize("command,data,heading", [
     ("commit", COMMIT, "--- Commit Message ---"), ("pr", PR, "--- PR Body ---"),
 ])
-def test_full_cli_with_fake_model(repo, monkeypatch, capsys, command, data, heading):
+@pytest.mark.parametrize("model_args,expected_model", [
+    ([], "file-model"), (["--model", "custom-model"], "custom-model"),
+])
+def test_full_cli_with_fake_model(repo, monkeypatch, capsys, command, data, heading,
+                                  model_args, expected_model):
     monkeypatch.chdir(repo)
-    (repo / ".env").write_text("openrouter_api_key=private-test-key\n")
+    (repo / ".env").write_text("openrouter_api_key=private-test-key\nLLM_MODEL=file-model\n")
     (repo / "sample.py").write_text("print('hello')\n")
     async def respond(messages, info):
         assert info.model_settings["temperature"] == 0.3
@@ -45,10 +63,10 @@ def test_full_cli_with_fake_model(repo, monkeypatch, capsys, command, data, head
     @asynccontextmanager
     async def session(config):
         assert config.api_key == "private-test-key"
-        assert config.model == "custom-model"
+        assert config.model == expected_model
         yield FunctionModel(respond)
     monkeypatch.setattr("gitdraft.generator.model_session", session)
-    assert main(["--model", "custom-model", command, "--temperature", "0.3"]) == 0
+    assert main([*model_args, command, "--temperature", "0.3"]) == 0
     output = capsys.readouterr()
     assert heading in output.out
     assert "--- Change Summary ---" in output.out
@@ -91,6 +109,7 @@ def test_legacy_option_spelling_and_safe_mode():
 def test_generation_failure_has_no_partial_output(repo, monkeypatch, capsys):
     monkeypatch.chdir(repo)
     monkeypatch.setenv("openrouter_api_key", "private-test-key")
+    monkeypatch.setenv("LLM_MODEL", "test-model")
     (repo / "sample.txt").write_text("hello\n")
     async def fail(changes, kind, config, stats):
         stats.attempts += 1

@@ -15,7 +15,6 @@ KEY_VARIABLES = {
     "openai-compatible": "LLM_API_KEY",
     "anthropic": "ANTHROPIC_API_KEY",
 }
-DEFAULT_MODEL = "openai/gpt-4.1-mini"
 
 
 @dataclass(frozen=True)
@@ -46,10 +45,8 @@ def resolve_config(
     if provider not in PROVIDERS:
         raise DraftError("지원하지 않는 LLM 제공자입니다. --help의 제공자 목록을 확인하세요.")
     model = model or os.getenv("LLM_MODEL")
-    if not model and provider == "openrouter":
-        model = DEFAULT_MODEL
     if not model or not model.strip():
-        raise DraftError("이 제공자는 --model 또는 LLM_MODEL 설정이 필요합니다.")
+        raise DraftError("모델이 설정되지 않았습니다. --model 또는 .env/환경변수의 LLM_MODEL을 지정하세요.")
     base_url = base_url or os.getenv("LLM_BASE_URL")
     if provider == "openai-compatible":
         try:
