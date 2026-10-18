@@ -1,0 +1,9 @@
+"""과제의 입력·호출·출력 규칙. 실행 환경에서 변경하지 않는 정책이다."""
+
+MAX_FILES = 10
+MAX_LINES = 200
+MAX_CHARS = 40_000
+MAX_RETRIES = 0
+MAX_API_REQUESTS = 1
+COMMIT_TITLE_MAX = 72
+PR_TITLE_MAX = 80

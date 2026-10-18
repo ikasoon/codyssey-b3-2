@@ -12,6 +12,7 @@ from gitdraft.config import LLMConfig
 from gitdraft.drafts import CommitDraft, PRDraft
 from gitdraft.errors import DraftError
 from gitdraft.gitio import Changes
+from gitdraft.policy import MAX_API_REQUESTS, MAX_RETRIES
 from gitdraft.prompts import COMMIT_INSTRUCTIONS, INSTRUCTIONS, PR_INSTRUCTIONS, DraftKind, build_prompt
 from gitdraft.providers import model_session
 from gitdraft.safety import redact
@@ -43,13 +44,13 @@ async def generate(
         output_type = CommitDraft if kind == "commit" else PRDraft
         instructions = INSTRUCTIONS + (COMMIT_INSTRUCTIONS if kind == "commit" else PR_INSTRUCTIONS)
         agent = Agent(selected, output_type=PromptedOutput(output_type),
-                      instructions=instructions, retries=0,
+                      instructions=instructions, retries=MAX_RETRIES,
                       model_settings={"temperature": config.temperature, "max_tokens": config.max_tokens})
         safe_changes = replace(changes, status=redact(changes.status, (config.api_key,)),
                                diff=redact(changes.diff, (config.api_key,)))
         prompt = build_prompt(safe_changes, kind)
         stats.attempts += 1
-        result = await agent.run(prompt, usage_limits=UsageLimits(request_limit=1))
+        result = await agent.run(prompt, usage_limits=UsageLimits(request_limit=MAX_API_REQUESTS))
         # 응답에도 입력에서 마스킹한 키나 토큰이 유출되지 않게 검증한다.
         values = result.output.model_dump()
         for key, value in values.items():

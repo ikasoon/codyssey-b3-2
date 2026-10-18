@@ -2,6 +2,7 @@ import json
 from typing import Literal
 
 from gitdraft.gitio import Changes
+from gitdraft.policy import COMMIT_TITLE_MAX, PR_TITLE_MAX
 
 DraftKind = Literal["commit", "pr"]
 
@@ -19,14 +20,14 @@ truncated가 true이면 입력이 일부임을 summary에 명시하고 전체 �
 staged와 unstaged 패치는 순차 상태이므로 두 패치를 함께 읽고 변경을 중복 요약하지 않는다.
 """
 
-COMMIT_INSTRUCTIONS = """커밋 제목은 소문자 영문 type과 한국어 subject로 구성한다.
-type: subject를 합쳐 50자 이내를 권장하고 최대 72자를 지킨다.
+COMMIT_INSTRUCTIONS = f"""커밋 제목은 소문자 영문 type과 한국어 subject로 구성한다.
+type: subject를 합쳐 50자 이내를 권장하고 최대 {COMMIT_TITLE_MAX}자를 지킨다.
 type은 feat, fix, docs, refactor, test, build, ci, chore, perf, style, revert 중 선택한다.
 as_is는 변경 전, to_be는 변경 후, what은 수정 내용, why는 변경 이유,
 how는 구현 방법과 검증 방법이다. 다섯 항목을 모두 작성한다.
 """
 
-PR_INSTRUCTIONS = """PR 제목은 한국어 한 줄로 최대 80자다.
+PR_INSTRUCTIONS = f"""PR 제목은 한국어 한 줄로 최대 {PR_TITLE_MAX}자다.
 why는 변경 배경, what은 핵심 변경, how_to_test는 검증 방법이다.
 각 항목에 하나 이상의 한국어 설명을 작성한다.
 """

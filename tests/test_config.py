@@ -1,6 +1,6 @@
 import pytest
 
-from gitdraft.config import PROVIDERS, load_environment, resolve_config
+from gitdraft.config import PROVIDERS, load_environment, resolve_config, resolve_settings
 from gitdraft.errors import DraftError
 
 
@@ -56,6 +56,93 @@ def test_explicit_options_override_environment(monkeypatch):
                             base_url="http://localhost:11434/v1", api_key_env="CUSTOM_KEY")
     assert config.model == "local-model"
     assert config.api_key == "custom-secret"
+
+
+def test_runtime_defaults_without_model_or_key():
+    settings = resolve_settings()
+    assert settings.provider == "openrouter"
+    assert settings.model is None
+    assert settings.temperature == 0.2
+    assert settings.max_tokens == 2048
+    assert settings.api_timeout == 60
+    assert settings.git_timeout == 30
+    assert settings.safe_mode is True
+
+
+@pytest.mark.parametrize("name,env,file_value,shell_value,cli_value", [
+    ("temperature", "LLM_TEMPERATURE", "0.3", "0.4", 0),
+    ("max_tokens", "LLM_MAX_TOKENS", "1024", "2048", 4096),
+    ("api_timeout", "LLM_TIMEOUT_SECONDS", "10", "20", 0.5),
+    ("git_timeout", "GITDRAFT_GIT_TIMEOUT_SECONDS", "5", "10", 0.5),
+    ("safe_mode", "GITDRAFT_SAFE_MODE", "false", "true", False),
+])
+def test_runtime_setting_priority(tmp_path, monkeypatch, name, env, file_value,
+                                  shell_value, cli_value):
+    (tmp_path / ".env").write_text(f"{env}={file_value}\n")
+    load_environment(tmp_path)
+    expected = file_value == "true" if name == "safe_mode" else float(file_value)
+    assert getattr(resolve_settings(), name) == expected
+    monkeypatch.setenv(env, shell_value)
+    load_environment(tmp_path)
+    expected = shell_value == "true" if name == "safe_mode" else float(shell_value)
+    assert getattr(resolve_settings(), name) == expected
+    assert getattr(resolve_settings(**{name: cli_value}), name) == cli_value
+
+
+@pytest.mark.parametrize("env,value,error", [
+    ("LLM_TEMPERATURE", "nan", "temperature"),
+    ("LLM_TEMPERATURE", "private-invalid-value", "temperature"),
+    ("LLM_MAX_TOKENS", "1.5", "max-tokens"),
+    ("LLM_MAX_TOKENS", "0", "max-tokens"),
+    ("LLM_TIMEOUT_SECONDS", "inf", "api-timeout"),
+    ("GITDRAFT_GIT_TIMEOUT_SECONDS", "0", "git-timeout"),
+    ("GITDRAFT_SAFE_MODE", "private-invalid-value", "GITDRAFT_SAFE_MODE"),
+])
+def test_invalid_environment_has_safe_error(monkeypatch, env, value, error):
+    monkeypatch.setenv(env, value)
+    with pytest.raises(DraftError, match=error) as exc:
+        resolve_settings()
+    assert "private-invalid-value" not in str(exc.value)
+
+
+@pytest.mark.parametrize("model", ["", " \t "])
+def test_explicit_blank_model_does_not_fall_back(monkeypatch, model):
+    monkeypatch.setenv("LLM_MODEL", "valid-environment-model")
+    with pytest.raises(DraftError, match="--model.*LLM_MODEL"):
+        resolve_config(model=model)
+
+
+@pytest.mark.parametrize("provider,key_name", [
+    ("openrouter", "openrouter_api_key"),
+    ("openai-compatible", "LLM_API_KEY"),
+    ("anthropic", "ANTHROPIC_API_KEY"),
+])
+def test_provider_selects_only_its_credential(monkeypatch, provider, key_name):
+    for name in ("openrouter_api_key", "LLM_API_KEY", "ANTHROPIC_API_KEY"):
+        monkeypatch.setenv(name, f"secret-{name}")
+    config = resolve_config(provider=provider, model="test-model",
+                            base_url="http://localhost:11434/v1" if provider == "openai-compatible" else None)
+    assert config.provider == provider
+    assert config.api_key == f"secret-{key_name}"
+
+
+def test_key_presence_does_not_choose_provider(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "private-anthropic-key")
+    monkeypatch.setenv("LLM_API_KEY", "private-generic-key")
+    with pytest.raises(DraftError, match="openrouter_api_key"):
+        resolve_config(model="test-model")
+
+
+@pytest.mark.parametrize("provider", PROVIDERS)
+def test_custom_key_name_is_independent_of_provider(tmp_path, monkeypatch, provider):
+    monkeypatch.delenv("TEAM_LLM_CREDENTIAL", raising=False)
+    (tmp_path / ".env").write_text("TEAM_LLM_CREDENTIAL=private-team-key\n")
+    load_environment(tmp_path)
+    config = resolve_config(provider=provider, model="test-model", api_key_env="TEAM_LLM_CREDENTIAL",
+                            base_url="http://localhost:11434/v1" if provider == "openai-compatible" else None)
+    assert config.provider == provider
+    assert config.api_key == "private-team-key"
+    assert "private-team-key" not in repr(config)
 
 
 @pytest.mark.parametrize("options,error", [

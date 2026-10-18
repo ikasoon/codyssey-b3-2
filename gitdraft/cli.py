@@ -1,48 +1,49 @@
 import argparse
 import asyncio
-import math
 import os
 import sys
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
-from gitdraft.config import PROVIDERS, load_environment, resolve_config
+from gitdraft.config import (
+    PROVIDERS, load_environment, parse_setting, resolve_config, resolve_settings, setting_default,
+)
 from gitdraft.drafts import CommitDraft, bullet_section, render_commit, render_pr
 from gitdraft.errors import DraftError
 from gitdraft.generator import RequestStats, generate
 from gitdraft.gitio import collect_changes, ensure_root
+from gitdraft.policy import MAX_CHARS, MAX_FILES, MAX_LINES
 
 
-def temperature_value(value: str) -> float:
-    try:
-        number = float(value)
-    except ValueError:
-        raise argparse.ArgumentTypeError("temperature는 숫자여야 합니다.") from None
-    if not math.isfinite(number) or not 0 <= number <= 1:
-        raise argparse.ArgumentTypeError("temperature는 0 이상 1 이하의 유한한 수여야 합니다.")
-    return number
-
-
-def token_value(value: str) -> int:
-    try:
-        number = int(value)
-    except ValueError:
-        raise argparse.ArgumentTypeError("max-tokens는 정수여야 합니다.") from None
-    if number < 1:
-        raise argparse.ArgumentTypeError("max-tokens는 1 이상이어야 합니다.")
-    return number
+def option_value(name: str) -> Callable[[str], Any]:
+    def parse(value: str) -> Any:
+        try:
+            return parse_setting(name, value)
+        except DraftError as exc:
+            raise argparse.ArgumentTypeError(str(exc)) from None
+    return parse
 
 
 def parser() -> argparse.ArgumentParser:
     options = argparse.ArgumentParser(add_help=False, argument_default=argparse.SUPPRESS)
-    options.add_argument("--provider", choices=PROVIDERS, help="LLM 제공자 (기본: OpenRouter)")
+    options.add_argument("--provider", choices=PROVIDERS,
+                         help=f"LLM 제공자 (기본: {setting_default('provider')})")
     options.add_argument("--model", "-model", help="모델 이름 (--model 또는 LLM_MODEL 필수, 기본값 없음)")
     options.add_argument("--base-url", help="OpenAI 호환 API 주소")
     options.add_argument("--api-key-env", help="API 키가 들어 있는 환경변수 이름")
-    options.add_argument("--temperature", "-temperature", type=temperature_value, help="생성 온도, 0~1 (기본: 0.2)")
-    options.add_argument("--max-tokens", "-max-tokens", type=token_value, help="응답 토큰 한도 (기본: 2048)")
+    options.add_argument("--temperature", "-temperature", type=option_value("temperature"),
+                         help=f"생성 온도, 0~1 (기본: {setting_default('temperature')})")
+    options.add_argument("--max-tokens", "-max-tokens", type=option_value("max_tokens"),
+                         help=f"응답 토큰 한도 (기본: {setting_default('max_tokens')})")
+    options.add_argument("--api-timeout", type=option_value("api_timeout"),
+                         help=f"API SDK 타임아웃 초 (기본: {setting_default('api_timeout'):g})")
+    options.add_argument("--git-timeout", type=option_value("git_timeout"),
+                         help=f"Git 명령 타임아웃 초 (기본: {setting_default('git_timeout'):g})")
     safety = options.add_mutually_exclusive_group()
     safety.add_argument("--safe-mode", "-safe-mode", action="store_true", dest="safe_mode",
-                        help="최대 10개 파일·200줄·40,000자 전송 (기본)")
+                        help=f"최대 {MAX_FILES}개 파일·{MAX_LINES}줄·{MAX_CHARS:,}자 전송 "
+                             f"(기본: {str(setting_default('safe_mode')).lower()})")
     safety.add_argument("--no-safe-mode", action="store_false", dest="safe_mode",
                         help="전송량 제한 해제 (민감 파일 제외와 마스킹은 유지)")
     result = argparse.ArgumentParser(
@@ -63,14 +64,14 @@ def info(message: str) -> None:
 def main(argv: list[str] | None = None) -> int:
     args = vars(parser().parse_args(argv))
     command = args.pop("command")
-    safe_mode = args.pop("safe_mode", True)
     stats = RequestStats()
     try:
         os.environ.setdefault("PYDANTIC_AI_NO_BANNER", "1")
         root = Path.cwd()
         ensure_root(root)
         load_environment(root)
-        changes = collect_changes(root, safe_mode=safe_mode)
+        settings = resolve_settings(**args)
+        changes = collect_changes(root, safe_mode=settings.safe_mode, timeout=settings.git_timeout)
         if not changes.total_files:
             info("변경 사항이 없습니다. 초안을 생성하지 않고 종료합니다.")
             return 0
@@ -83,7 +84,7 @@ def main(argv: list[str] | None = None) -> int:
         info(f"Git diff 수집 완료: {len(changes.diff.splitlines())}줄")
         if changes.truncated:
             info("안전 모드 제한으로 변경 일부만 전송합니다. 초안의 누락 여부를 검토하세요.")
-        config = resolve_config(**args)
+        config = resolve_config(settings)
         info("AI API 요청 중...")
         draft = asyncio.run(generate(changes, command, config, stats))
         # 모든 형식 검증을 마친 후 출력하여 불완전한 초안이 남지 않게 한다.

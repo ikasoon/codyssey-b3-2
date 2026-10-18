@@ -2,13 +2,14 @@ import subprocess
 
 import pytest
 from pydantic_ai import models
+from gitdraft.config import Settings
 
 
 @pytest.fixture(autouse=True)
 def no_live_models(monkeypatch):
     monkeypatch.setattr(models, "ALLOW_MODEL_REQUESTS", False)
     for name in ("openrouter_api_key", "ANTHROPIC_API_KEY", "LLM_API_KEY",
-                 "LLM_PROVIDER", "LLM_MODEL", "LLM_BASE_URL", "LLM_API_KEY_ENV"):
+                 *(field.validation_alias for field in Settings.model_fields.values())):
         monkeypatch.delenv(name, raising=False)
 
 

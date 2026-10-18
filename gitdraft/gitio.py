@@ -3,8 +3,10 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
+from gitdraft.config import setting_default
 from gitdraft.errors import DraftError
-from gitdraft.safety import MAX_FILES, limit_diff, redact, sensitive_path
+from gitdraft.policy import MAX_FILES
+from gitdraft.safety import limit_diff, redact, sensitive_path
 
 
 @dataclass(frozen=True)
@@ -29,12 +31,12 @@ def ensure_root(root: Path) -> None:
         raise DraftError("Git 저장소 루트 디렉토리에서 실행하세요.")
 
 
-def _git(root: Path, *args: str, diff_exit: bool = False) -> str:
+def _git(root: Path, *args: str, timeout: float, diff_exit: bool = False) -> str:
     try:
         result = subprocess.run(
             ["git", "--literal-pathspecs", "-c", "core.quotePath=false", *args],
             cwd=root, stdin=subprocess.DEVNULL, capture_output=True,
-            encoding="utf-8", errors="replace", timeout=30,
+            encoding="utf-8", errors="replace", timeout=timeout,
             env={**os.environ, "GIT_OPTIONAL_LOCKS": "0"},
         )
     except FileNotFoundError:
@@ -56,9 +58,11 @@ def parse_status(raw: str) -> list[Change]:
     return changes
 
 
-def collect_changes(root: Path, *, safe_mode: bool = True) -> Changes:
+def collect_changes(root: Path, *, safe_mode: bool = setting_default("safe_mode"),
+                    timeout: float = setting_default("git_timeout")) -> Changes:
     ensure_root(root)
-    changes = parse_status(_git(root, "status", "--porcelain=v1", "-z", "--untracked-files=all"))
+    changes = parse_status(_git(root, "status", "--porcelain=v1", "-z", "--untracked-files=all",
+                               timeout=timeout))
     if any(c.status in {"DD", "AU", "UD", "UA", "DU", "AA", "UU"} for c in changes):
         raise DraftError("병합 충돌을 먼저 해결한 뒤 실행하세요.")
     allowed = [c for c in changes if not sensitive_path(c.path)
@@ -71,13 +75,13 @@ def collect_changes(root: Path, *, safe_mode: bool = True) -> Changes:
     patches = []
     if paths:
         for flags, label in ((('--cached',), 'Staged'), ((), 'Unstaged')):
-            patch = _git(root, "diff", *options, *flags, "--", *paths)
+            patch = _git(root, "diff", *options, *flags, "--", *paths, timeout=timeout)
             if patch:
                 patches.append(f"[{label}]\n{patch}")
     for change in selected:
         if change.status == "??":
             patch = _git(root, "diff", *options, "--no-index", "--", os.devnull,
-                         change.path, diff_exit=True)
+                         change.path, diff_exit=True, timeout=timeout)
             patches.append(f"[Untracked]\n{patch}")
     diff, truncated = limit_diff(redact("\n".join(patches)), safe_mode)
     status = redact("\n".join(f"{c.status} {c.path!r}" for c in selected))

@@ -2,9 +2,7 @@ import os
 import re
 from pathlib import PurePosixPath
 
-MAX_FILES = 10
-MAX_LINES = 200
-MAX_CHARS = 40_000
+from gitdraft.policy import MAX_CHARS, MAX_LINES
 
 
 def sensitive_path(path: str) -> bool:

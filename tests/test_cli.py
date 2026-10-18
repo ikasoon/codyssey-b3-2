@@ -9,6 +9,7 @@ from pydantic_ai.messages import ModelResponse, TextPart
 from pydantic_ai.models.function import FunctionModel
 
 from gitdraft.cli import main, parser
+from gitdraft.drafts import CommitDraft
 from gitdraft.errors import DraftError
 from test_generator import COMMIT, PR
 
@@ -82,6 +83,54 @@ def test_only_sensitive_files_skip_model(repo, monkeypatch, capsys):
     assert "API 호출 시도: 0회" in capsys.readouterr().err
 
 
+@pytest.mark.parametrize("overrides,safe_mode,temperature,api_timeout,git_timeout", [
+    ([], False, 0.7, 12.5, 7.5),
+    (["--safe-mode", "--temperature", "0", "--api-timeout", "2", "--git-timeout", "3"],
+     True, 0, 2, 3),
+])
+def test_runtime_settings_reach_collection_and_generation(
+    repo, monkeypatch, capsys, overrides, safe_mode, temperature, api_timeout, git_timeout,
+):
+    monkeypatch.chdir(repo)
+    (repo / ".env").write_text(
+        "openrouter_api_key=private-test-key\nLLM_MODEL=file-model\n"
+        "LLM_TEMPERATURE=0.7\nLLM_MAX_TOKENS=1024\nLLM_TIMEOUT_SECONDS=12.5\n"
+        "GITDRAFT_GIT_TIMEOUT_SECONDS=7.5\nGITDRAFT_SAFE_MODE=false\n"
+    )
+    monkeypatch.setenv("LLM_MAX_TOKENS", "4096")
+    (repo / "sample.txt").write_text("변경 내용\n" * 300)
+    from gitdraft.gitio import collect_changes
+    def collect(root, **options):
+        assert options == {"safe_mode": safe_mode, "timeout": git_timeout}
+        return collect_changes(root, **options)
+    async def generate(changes, kind, config, stats):
+        assert changes.truncated is safe_mode
+        assert config.model == "file-model"
+        assert config.temperature == temperature
+        assert config.max_tokens == 4096
+        assert config.api_timeout == api_timeout
+        stats.attempts += 1
+        return CommitDraft(**COMMIT)
+    monkeypatch.setattr("gitdraft.cli.collect_changes", collect)
+    monkeypatch.setattr("gitdraft.cli.generate", generate)
+    assert main(["commit", *overrides]) == 0
+    output = capsys.readouterr()
+    assert "--- Commit Message ---" in output.out
+    assert "API 호출 시도: 1회" in output.err
+    assert "private-test-key" not in output.out + output.err
+
+
+def test_invalid_environment_fails_without_api_call(repo, monkeypatch, capsys):
+    monkeypatch.chdir(repo)
+    monkeypatch.setenv("LLM_TEMPERATURE", "private-invalid-value")
+    (repo / "sample.txt").write_text("hello\n")
+    assert main(["commit"]) == 1
+    output = capsys.readouterr()
+    assert "temperature" in output.err
+    assert "API 호출 시도: 0회" in output.err
+    assert "private-invalid-value" not in output.out + output.err
+
+
 def test_wrong_directory(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
     assert main(["pr"]) == 1
@@ -91,6 +140,7 @@ def test_wrong_directory(tmp_path, monkeypatch, capsys):
 @pytest.mark.parametrize("args", [
     ["commit", "--temperature", "nan"], ["pr", "--temperature", "2"],
     ["commit", "--max-tokens", "0"], ["commit", "--provider", "invalid"],
+    ["commit", "--api-timeout", "inf"], ["pr", "--git-timeout", "0"],
 ])
 def test_invalid_options_fail_before_collection(args):
     with pytest.raises(SystemExit) as exc:

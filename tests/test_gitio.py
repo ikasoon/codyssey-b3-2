@@ -92,6 +92,19 @@ def test_git_timeout_has_safe_error(repo, monkeypatch):
         collect_changes(repo)
 
 
+def test_timeout_reaches_every_git_command(repo, monkeypatch):
+    (repo / "sample.py").write_text("print('hello')\n")
+    calls = []
+    original = subprocess.run
+    def run(*args, **kwargs):
+        calls.append(kwargs["timeout"])
+        return original(*args, **kwargs)
+    monkeypatch.setattr("gitdraft.gitio.subprocess.run", run)
+    assert collect_changes(repo, timeout=7.5).diff
+    assert len(calls) >= 2
+    assert all(value == 7.5 for value in calls)
+
+
 def test_single_long_line_is_limited():
     text, truncated = limit_diff("a" * 50_000, True)
     assert truncated and len(text) == 40_000

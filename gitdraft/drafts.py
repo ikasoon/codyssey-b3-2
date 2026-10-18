@@ -5,6 +5,7 @@ from typing import Annotated, Literal
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field
 
 from gitdraft.errors import DraftError
+from gitdraft.policy import COMMIT_TITLE_MAX, PR_TITLE_MAX
 
 
 def korean_line(value: str) -> str:
@@ -57,14 +58,14 @@ def bullet_section(heading: str, items: list[str]) -> str:
 
 
 def render_commit(draft: CommitDraft) -> str:
-    title = shorten_title(f"{draft.type}: {draft.subject}", 72)
+    title = shorten_title(f"{draft.type}: {draft.subject}", COMMIT_TITLE_MAX)
     sections = [("As-is", draft.as_is), ("To-be", draft.to_be),
                 ("What", draft.what), ("Why", draft.why), ("How", draft.how)]
     return title + "\n\n" + "\n\n".join(bullet_section(*section) for section in sections)
 
 
 def render_pr(draft: PRDraft) -> tuple[str, str]:
-    title = shorten_title(draft.title, 80)
+    title = shorten_title(draft.title, PR_TITLE_MAX)
     body = "\n\n".join(bullet_section(*section) for section in (
         ("## Why", draft.why), ("## What", draft.what), ("## How to Test", draft.how_to_test),
     ))
