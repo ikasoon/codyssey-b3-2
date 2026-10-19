@@ -19,7 +19,7 @@ uv가 `.python-version`에 지정한 Python 3.12와 `uv.lock`의 의존성으로
 
 ```dotenv
 OPENROUTER_API_KEY=발급받은_OpenRouter_API_키
-LLM_MODEL=google/gemma-4-31b-it:free
+LLM_MODEL=google/gemma-4-31b-it
 ```
 
 사용할 모델을 `.env`·셸 환경변수의 `LLM_MODEL` 또는 `--model`로 반드시 지정한다. 생성 시 모델이 없거나 공백뿐이면 API 호출 없이 오류로 종료한다.
