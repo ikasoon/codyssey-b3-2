@@ -14,15 +14,15 @@ run +args:
 
 # 한국어 커밋 메시지 초안 생성
 commit *args:
-    uv run --locked python main.py commit "$@"
+    @just run python main.py commit "$@"
 
 # 한국어 PR 제목과 본문 초안 생성
 pr *args:
-    uv run --locked python main.py pr "$@"
+    @just run python main.py pr "$@"
 
 # 실제 LLM 호출 없이 pytest 실행
 test *args:
-    uv run --locked pytest "$@"
+    @just run pytest "$@"
 
 # 의존성 추가: just add httpx / just add --dev pytest
 add +args:
