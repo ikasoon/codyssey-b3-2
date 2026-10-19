@@ -19,12 +19,10 @@ uv가 `.python-version`에 지정한 Python 3.12와 `uv.lock`의 의존성으로
 
 ```dotenv
 OPENROUTER_API_KEY=발급받은_OpenRouter_API_키
-LLM_MODEL=openai/gpt-4.1-mini
+LLM_MODEL=google/gemma-4-31b-it:free
 ```
 
-변수 이름은 대문자 `OPENROUTER_API_KEY`다. `.env`는 애플리케이션 시작 시 읽으며, 이미 설정된 셸 환경변수가 우선한다. 키는 코드나 CLI 인자로 입력하지 않는다. `.env`는 Git 제외 대상이다.
-
-모델에는 코드 기본값이 없다. 위 모델 ID는 설정 예시이며, 사용할 모델을 `.env`·셸 환경변수의 `LLM_MODEL` 또는 `--model`로 반드시 지정한다. 초안 생성 시 모델이 없거나 공백뿐이면 API 호출 없이 오류로 종료한다.
+사용할 모델을 `.env`·셸 환경변수의 `LLM_MODEL` 또는 `--model`로 반드시 지정한다. 생성 시 모델이 없거나 공백뿐이면 API 호출 없이 오류로 종료한다.
 
 ## 실행
 
